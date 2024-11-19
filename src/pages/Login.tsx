@@ -1,11 +1,11 @@
+import { Logo } from '@/components/Logo';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/contexts/auth-context';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/auth-context';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Logo } from '@/components/Logo';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ export default function Login() {
       </div>
       <Card className="w-full max-w-[400px]">
         <CardHeader className="space-y-1 text-center">
-          <h1 className="text-2xl font-bold">Welcome back</h1>
+          <h1 className="text-2xl font-bold">Welcome Back</h1>
           <p className="text-sm text-muted-foreground">
             Enter your credentials to access your account
           </p>

@@ -1,6 +1,7 @@
 import pb from '@/lib/pocketbase';
 import { syncLibrary } from '@/lib/services/librarySync';
 import cron from 'node-cron';
+import { ServiceType } from '../types';
 
 const synchronizeLibraries = async () => {
   try {
@@ -13,10 +14,12 @@ const synchronizeLibraries = async () => {
       for (const service of services) {
         if (
           service.connected &&
-          (service.id === 'spotify' || service.id === 'apple-music')
+          (service.id === 'spotify' ||
+            service.id === 'apple-music' ||
+            service.id === 'tidal')
         ) {
           try {
-            await syncLibrary(user.id, service.id as 'spotify' | 'apple-music');
+            await syncLibrary(user.id, service.id as ServiceType);
             console.log(
               `Successfully synced ${service.id} for user ${user.id}`
             );

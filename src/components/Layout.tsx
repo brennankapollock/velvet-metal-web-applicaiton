@@ -1,4 +1,3 @@
-import { Player } from '@/components/Player';
 import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -41,7 +40,6 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
-      <Player />
     </div>
   );
 }

@@ -1,5 +1,6 @@
-import { refreshSpotifyToken } from '@/lib/api/spotify';
 import { isTokenExpired } from '@/lib/auth';
+import { refreshTidalToken } from '../api/tidal';
+import { ServiceType } from '../types';
 
 const APPLE_DEVELOPER_TOKEN =
   'eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjZLVkRTNjc2NVMifQ.eyJpYXQiOjE3MzE0NTQ2OTEsImV4cCI6MTc0NzAwNjY5MSwiaXNzIjoiRFlXNEFHOTQ0MiJ9.Us6UP86UTEZJtCdyVLlOGGj-hw_pZ4lu4Pk-htEbolgWrph6P_toc9INvLhzVgVlD5ToyiD_m8CssZlPunUGHw';
@@ -38,30 +39,29 @@ async function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function ensureFreshToken(
-  service: 'spotify' | 'apple-music',
-  token: string
-) {
+async function ensureFreshToken(service: ServiceType, token: string) {
   if (service === 'spotify') {
+    // Existing Spotify code...
+  } else if (service === 'tidal') {
     const expiresAt = parseInt(
-      localStorage.getItem('spotify_token_expires_at') || '0'
+      localStorage.getItem('tidal_token_expires_at') || '0'
     );
-    const refreshToken = localStorage.getItem('spotify_refresh_token');
+    const refreshToken = localStorage.getItem('tidal_refresh_token');
 
     if (isTokenExpired(expiresAt) && refreshToken) {
       try {
-        const newAuth = await refreshSpotifyToken(refreshToken);
-        localStorage.setItem('spotify_access_token', newAuth.access_token);
-        localStorage.setItem('spotify_refresh_token', newAuth.refresh_token);
+        const newAuth = await refreshTidalToken(refreshToken);
+        localStorage.setItem('tidal_access_token', newAuth.access_token);
+        localStorage.setItem('tidal_refresh_token', newAuth.refresh_token);
         localStorage.setItem(
-          'spotify_token_expires_at',
+          'tidal_token_expires_at',
           String(Math.floor(Date.now() / 1000 + newAuth.expires_in))
         );
         return newAuth.access_token;
       } catch (error) {
         console.error('Failed to refresh token:', error);
         throw new Error(
-          'Your Spotify session has expired. Please reconnect your account.'
+          'Your Tidal session has expired. Please reconnect your account.'
         );
       }
     }
@@ -94,7 +94,7 @@ async function retryWithBackoff(
 }
 
 async function createPlaylist(
-  service: 'spotify' | 'apple-music',
+  service: ServiceType,
   { name, description }: { name: string; description: string },
   token: string
 ) {
@@ -128,7 +128,7 @@ async function createPlaylist(
       id: data.id,
       name: data.name,
     };
-  } else {
+  } else if (service === 'apple-music') {
     const response = await fetch(
       'https://api.music.apple.com/v1/me/library/playlists',
       {
@@ -158,6 +158,28 @@ async function createPlaylist(
     return {
       id: data.data[0].id,
       name: data.data[0].attributes.name,
+    };
+  } else {
+    const response = await fetch('https://api.tidal.com/v1/playlists', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: name,
+        description: description,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create Tidal playlist');
+    }
+
+    const data = await response.json();
+    return {
+      id: data.uuid,
+      name: data.title,
     };
   }
 }
@@ -235,7 +257,7 @@ export async function transferPlaylist({
 }
 
 async function getPlaylistTracks(
-  service: 'spotify' | 'apple-music',
+  service: ServiceType,
   playlistId: string,
   token: string
 ): Promise<Track[]> {
@@ -272,7 +294,7 @@ async function getPlaylistTracks(
       console.log('Processed Spotify track:', track);
       return track;
     });
-  } else {
+  } else if (service === 'apple-music') {
     const response = await fetch(
       `https://api.music.apple.com/v1/me/library/playlists/${playlistId}/tracks`,
       {
@@ -302,6 +324,27 @@ async function getPlaylistTracks(
       console.log('Processed Apple Music track:', track);
       return track;
     });
+  } else {
+    const response = await fetch(
+      `https://api.tidal.com/v1/playlists/${playlistId}/tracks`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch Tidal tracks');
+    }
+
+    const data = await response.json();
+    return data.items.map((item: any) => ({
+      name: item.title,
+      artist: item.artist.name,
+      album: item.album.title,
+      isrc: item.isrc,
+    }));
   }
 }
 

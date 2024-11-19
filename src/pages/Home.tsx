@@ -3,11 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/auth-context';
 import { authorizeAppleMusic } from '@/lib/api/apple-music';
 import { getSpotifyAuthUrl } from '@/lib/api/spotify';
+import { getTidalAuthUrl } from '@/lib/api/tidal';
 import pb from '@/lib/pocketbase';
 import { syncLibrary } from '@/lib/services/librarySync';
 import updateConnectedServices from '@/lib/services/updateConnectedServices';
 import { useQuery } from '@tanstack/react-query';
 import { Check, Music, Music2 } from 'lucide-react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -32,6 +34,12 @@ export default function Home() {
   const isAppleMusicConnected = userServices?.some(
     (service) => service.id === 'apple-music' && service.connected
   );
+
+  const isTidalConnected = useMemo(() => {
+    return userServices?.some(
+      (service: any) => service.id === 'tidal' && service.connected
+    );
+  }, [userServices]);
 
   const handleSpotifyConnect = () => {
     window.location.href = getSpotifyAuthUrl();
@@ -61,6 +69,11 @@ export default function Home() {
     }
   };
 
+  const handleTidalConnect = async () => {
+    const authUrl = await getTidalAuthUrl();
+    window.location.href = authUrl;
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -72,7 +85,7 @@ export default function Home() {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h2 className="text-4xl font-bold tracking-tight">
-              Welcome back, {user?.name}
+              Welcome {user?.name}
             </h2>
             <p className="text-lg text-muted-foreground">
               Connect your music services to get started
@@ -131,6 +144,30 @@ export default function Home() {
                 <Button
                   onClick={handleAppleMusicConnect}
                   className="relative w-full max-w-[200px] overflow-hidden bg-gradient-to-r from-pink-500 to-pink-600 transition-transform hover:scale-[1.02] px-8 py-6"
+                >
+                  <span className="relative z-10">Connect</span>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="group relative overflow-hidden border-2 transition-all hover:border-primary/50">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3 text-xl">
+                <Music className="h-7 w-7" />
+                Tidal
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center justify-center min-h-[100px]">
+              {isTidalConnected ? (
+                <div className="flex items-center gap-3 rounded-lg bg-green-500/10 p-4 text-green-500">
+                  <Check className="h-5 w-5" />
+                  <span className="font-medium">Connected to Tidal</span>
+                </div>
+              ) : (
+                <Button
+                  onClick={handleTidalConnect}
+                  className="relative w-full max-w-[200px] overflow-hidden bg-gradient-to-r from-blue-500 to-blue-600 transition-transform hover:scale-[1.02] px-8 py-6"
                 >
                   <span className="relative z-10">Connect</span>
                 </Button>

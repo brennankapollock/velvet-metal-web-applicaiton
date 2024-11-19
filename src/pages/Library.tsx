@@ -38,8 +38,6 @@ import {
   List,
   ListMusic,
   Loader2,
-  Music,
-  Music2,
   RefreshCw,
   Search,
 } from 'lucide-react';
@@ -202,22 +200,37 @@ export default function Library() {
       const accessToken = localStorage.getItem(
         activeService === 'spotify'
           ? 'spotify_access_token'
-          : 'apple_music_token'
+          : activeService === 'apple-music'
+          ? 'apple_music_token'
+          : 'tidal_access_token'
       );
-      const refreshToken = localStorage.getItem('spotify_refresh_token');
+      const refreshToken = localStorage.getItem(
+        activeService === 'spotify'
+          ? 'spotify_refresh_token'
+          : activeService === 'tidal'
+          ? 'tidal_refresh_token'
+          : ''
+      );
 
       if (!isServiceConnected) {
         toast.error(
           `Please connect your ${
-            activeService === 'spotify' ? 'Spotify' : 'Apple Music'
+            activeService === 'spotify'
+              ? 'Spotify'
+              : activeService === 'apple-music'
+              ? 'Apple Music'
+              : 'Tidal'
           } account first`
         );
         navigate('/');
         return;
       }
 
-      if (activeService === 'spotify' && (!accessToken || !refreshToken)) {
-        toast.error('Please reconnect your Spotify account');
+      if (
+        (activeService === 'spotify' || activeService === 'tidal') &&
+        (!accessToken || !refreshToken)
+      ) {
+        toast.error(`Please reconnect your ${activeService} account`);
         navigate('/');
         return;
       }
@@ -236,7 +249,11 @@ export default function Library() {
       if (error instanceof Error && error.message.includes('token')) {
         toast.error(
           `Please reconnect your ${
-            activeService === 'spotify' ? 'Spotify' : 'Apple Music'
+            activeService === 'spotify'
+              ? 'Spotify'
+              : activeService === 'apple-music'
+              ? 'Apple Music'
+              : 'Tidal'
           } account`
         );
         navigate('/');
@@ -258,7 +275,7 @@ export default function Library() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Your Library</h2>
             <p className="text-muted-foreground">
-              Your music collection from{' '}
+              Your Music Collection From{' '}
               {activeService === 'spotify' ? 'Spotify' : 'Apple Music'}
             </p>
           </div>
@@ -287,7 +304,7 @@ export default function Library() {
             <div className="grid gap-4 md:grid-cols-[1fr_auto_auto]">
               {/* Left Section: Tabs and Service Selection */}
               <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
-                <TabsList className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
+                <TabsList className="inline-flex h-9 items-center justify-center rounded-lg  p-1 text-muted-foreground">
                   <TabsTrigger
                     value="albums"
                     className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-5 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
@@ -304,30 +321,21 @@ export default function Library() {
                   </TabsTrigger>
                 </TabsList>
 
-                <div className="flex h-9 items-center gap-0.5 rounded-md border p-0.5">
-                  <Button
-                    variant={
-                      activeService === 'spotify' ? 'secondary' : 'ghost'
-                    }
-                    size="sm"
-                    onClick={() => setActiveService('spotify')}
-                    className="flex-1 sm:flex-initial"
-                  >
-                    <Music className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Spotify</span>
-                  </Button>
-                  <Button
-                    variant={
-                      activeService === 'apple-music' ? 'secondary' : 'ghost'
-                    }
-                    size="sm"
-                    onClick={() => setActiveService('apple-music')}
-                    className="flex-1 sm:flex-initial"
-                  >
-                    <Music2 className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Apple Music</span>
-                  </Button>
-                </div>
+                <Select
+                  value={activeService}
+                  onValueChange={(value: ServiceType) =>
+                    setActiveService(value)
+                  }
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select Service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="spotify">Spotify</SelectItem>
+                    <SelectItem value="apple-music">Apple Music</SelectItem>
+                    <SelectItem value="tidal">Tidal</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Middle Section: Search */}

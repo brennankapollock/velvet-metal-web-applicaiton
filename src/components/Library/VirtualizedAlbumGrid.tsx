@@ -77,9 +77,10 @@ const VirtualizedGrid = ({
   return (
     <div
       style={{
-        height: 'calc(100vh - 300px)',
+        height: 'calc(100vh - 100px)',
         width: '100%',
         padding: `${GRID_GAP}px 0`,
+        minHeight: '300px',
       }}
     >
       <AutoSizer>

@@ -3,7 +3,6 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/contexts/auth-context';
-import { PlayerProvider } from '@/contexts/player-context';
 import AlbumDetails from '@/pages/AlbumDetails';
 import Home from '@/pages/Home';
 import Library from '@/pages/Library';
@@ -11,6 +10,7 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Settings from '@/pages/Settings';
 import SpotifyCallback from '@/pages/SpotifyCallback';
+import TidalCallback from '@/pages/TidalCallback';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import {
@@ -37,24 +37,23 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <PlayerProvider>
-            <Router>
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/spotify/callback" element={<SpotifyCallback />} />
-                <Route element={<ProtectedRoute />}>
-                  <Route element={<Layout />}>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/library" element={<Library />} />
-                    <Route path="/album/:id" element={<AlbumDetails />} />
-                    <Route path="/settings" element={<Settings />} />
-                  </Route>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/spotify/callback" element={<SpotifyCallback />} />
+              <Route path="/tidal/callback" element={<TidalCallback />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<Layout />}>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/library" element={<Library />} />
+                  <Route path="/album/:id" element={<AlbumDetails />} />
+                  <Route path="/settings" element={<Settings />} />
                 </Route>
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Router>
-          </PlayerProvider>
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
         </AuthProvider>
         <Toaster />
       </ThemeProvider>

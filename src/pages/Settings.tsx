@@ -1,3 +1,4 @@
+import { useTheme } from '@/components/theme-provider';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -7,10 +8,9 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { useTheme } from '@/components/theme-provider';
-import { toast } from 'sonner';
 import { useAuth } from '@/contexts/auth-context';
 import pb from '@/lib/pocketbase';
+import { toast } from 'sonner';
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
@@ -63,6 +63,29 @@ export default function Settings() {
     } catch (error) {
       console.error('Failed to disconnect from Apple Music:', error);
       toast.error('Failed to disconnect from Apple Music');
+    }
+  };
+
+  const handleDisconnectTidal = async () => {
+    try {
+      const userRecord = await pb.collection('users').getOne(user.id);
+      const services = userRecord.connectedServices || [];
+
+      const updatedServices = services.map((service) =>
+        service.id === 'tidal' ? { ...service, connected: false } : service
+      );
+
+      await pb.collection('users').update(user.id, {
+        connectedServices: updatedServices,
+      });
+
+      localStorage.removeItem('tidal_access_token');
+      localStorage.removeItem('tidal_refresh_token');
+      localStorage.removeItem('tidal_token_expires_at');
+      toast.success('Disconnected from Tidal');
+    } catch (error) {
+      console.error('Failed to disconnect from Tidal:', error);
+      toast.error('Failed to disconnect from Tidal');
     }
   };
 
@@ -126,6 +149,17 @@ export default function Settings() {
                 variant="destructive"
                 onClick={handleDisconnectAppleMusic}
               >
+                Disconnect
+              </Button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h3 className="font-medium">Tidal</h3>
+                <p className="text-sm text-muted-foreground">
+                  Disconnect your Tidal account
+                </p>
+              </div>
+              <Button variant="destructive" onClick={handleDisconnectTidal}>
                 Disconnect
               </Button>
             </div>

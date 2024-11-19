@@ -1,4 +1,4 @@
-export type ServiceType = 'spotify' | 'apple-music';
+export type ServiceType = 'spotify' | 'apple-music' | 'tidal';
 export type ViewMode = 'grid' | 'list';
 
 export interface UserAlbums {
@@ -27,7 +27,7 @@ export interface NormalizedAlbum {
   releaseDate: string;
   trackCount: number;
   dateAdded?: string;
-  sourceService: 'spotify' | 'apple-music';
+  sourceService: ServiceType;
   sourceId: string;
 }
 

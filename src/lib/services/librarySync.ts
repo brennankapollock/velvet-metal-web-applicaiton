@@ -4,12 +4,15 @@ import {
 } from '@/lib/api/apple-music';
 import { getAllSpotifyAlbums, getSpotifyPlaylists } from '@/lib/api/spotify';
 import pb from '@/lib/pocketbase';
-import { NormalizedAlbum, SyncProgress } from '@/lib/types';
+import {
+  NormalizedAlbum,
+  NormalizedPlaylist,
+  ServiceType,
+  SyncProgress,
+} from '@/lib/types';
+import { getTidalAlbums, getTidalPlaylists } from '../api/tidal';
 
-function normalizeAlbumData(
-  album: any,
-  service: 'spotify' | 'apple-music'
-): NormalizedAlbum {
+function normalizeAlbumData(album: any, service: ServiceType): NormalizedAlbum {
   if (service === 'spotify') {
     return {
       id: album.album?.id || album.id,
@@ -26,7 +29,7 @@ function normalizeAlbumData(
       trackCount: album.album?.total_tracks || 0,
       dateAdded: album.added_at || null,
     };
-  } else {
+  } else if (service === 'apple-music') {
     // Apple Music
     const artworkUrl = album.attributes?.artwork?.url
       ? album.attributes.artwork.url
@@ -49,6 +52,23 @@ function normalizeAlbumData(
       trackCount: album.attributes?.trackCount || 0,
       dateAdded: album.attributes?.dateAdded || null,
     };
+  } else {
+    // Tidal
+    return {
+      id: album.item.id.toString(),
+      sourceId: album.item.id.toString(),
+      sourceService: 'tidal',
+      name: album.item.title || '',
+      artistName: album.item.artists?.[0]?.name || '',
+      artwork: {
+        url: album.item.cover || '',
+        width: 1280,
+        height: 1280,
+      },
+      releaseDate: album.item.releaseDate || '',
+      trackCount: album.item.numberOfTracks || 0,
+      dateAdded: album.created || null,
+    };
   }
 }
 
@@ -70,7 +90,7 @@ export function normalizePlaylistData(
       trackCount: playlist.tracks?.total || 0,
       dateAdded: playlist.added_at || null,
     };
-  } else {
+  } else if (service === 'apple-music') {
     // Apple Music
     const artworkUrl = playlist.attributes?.artwork?.url
       ? playlist.attributes.artwork.url
@@ -91,16 +111,35 @@ export function normalizePlaylistData(
       trackCount: playlist.attributes?.trackCount || 0,
       dateAdded: playlist.attributes?.dateAdded || null,
     };
+  } else {
+    // Tidal
+    return {
+      id: playlist.uuid,
+      sourceId: playlist.uuid,
+      sourceService: 'tidal',
+      name: playlist.title || 'Untitled Playlist',
+      artwork: {
+        url: playlist.image || '',
+        width: null,
+        height: null,
+      },
+      trackCount: playlist.numberOfTracks || 0,
+      dateAdded: playlist.created || null,
+    };
   }
 }
 
 export async function syncLibrary(
   userId: string,
-  service: 'spotify' | 'apple-music',
+  service: ServiceType,
   onProgress?: (progress: SyncProgress) => void
 ) {
   const token = localStorage.getItem(
-    service === 'spotify' ? 'spotify_access_token' : 'apple_music_token'
+    service === 'spotify'
+      ? 'spotify_access_token'
+      : service === 'apple-music'
+      ? 'apple_music_token'
+      : 'tidal_access_token'
   );
 
   console.log('Syncing Library for User:', userId, 'With Service:', service);
@@ -114,10 +153,14 @@ export async function syncLibrary(
       phase: 'albums',
       service,
     });
-    const albums =
-      service === 'spotify'
-        ? { items: await getAllSpotifyAlbums(userId, token) }
-        : await getAppleMusicAlbums(token);
+    let albums;
+    if (service === 'spotify') {
+      albums = { items: await getAllSpotifyAlbums(userId, token) };
+    } else if (service === 'apple-music') {
+      albums = await getAppleMusicAlbums(token);
+    } else {
+      albums = await getTidalAlbums(token);
+    }
 
     onProgress?.({
       total: 100,
@@ -130,7 +173,9 @@ export async function syncLibrary(
     const playlists =
       service === 'spotify'
         ? await getSpotifyPlaylists(token)
-        : await getAppleMusicLibrary(token);
+        : service === 'apple-music'
+        ? await getAppleMusicLibrary(token)
+        : await getTidalPlaylists(token);
 
     console.log('Fetched Data:', {
       albumsCount: albums?.items?.length || 0,
@@ -163,16 +208,20 @@ export async function syncLibrary(
     const albumsData = {
       user: userId,
       service,
-      albums: (service === 'spotify' ? albums.items : albums.data).map(
-        (album: any) => normalizeAlbumData(album, service)
-      ),
+      albums:
+        service === 'spotify' || service === 'tidal'
+          ? albums.items
+          : albums.data,
       lastSynced: now,
     };
 
     const playlistsData = {
       user: userId,
       service,
-      playlists: service === 'spotify' ? playlists.items : playlists.data,
+      playlists:
+        service === 'spotify' || service === 'tidal'
+          ? playlists.items
+          : playlists.data,
       lastSynced: now,
     };
 
@@ -207,17 +256,18 @@ export async function syncLibrary(
     return { albums, playlists };
   } catch (error) {
     console.error('Failed to sync library:', error);
-    // Re-throw the error so it can be handled by the caller
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+      });
+    }
     throw error;
   }
 }
 
-export async function getStoredLibrary(
-  userId: string,
-  service: 'spotify' | 'apple-music'
-) {
+export async function getStoredLibrary(userId: string, service: ServiceType) {
   try {
-    // Fetch albums and playlists separately to handle individual failures
     let albumsRecord = null;
     let playlistsRecord = null;
 
@@ -230,37 +280,22 @@ export async function getStoredLibrary(
 
       console.log('Albums Record Found:', albumsRecord);
     } catch (error) {
-      // Album record doesn't exist yet, continue with empty albums
       albumsRecord = { albums: [], lastSynced: new Date() };
     }
-
-    console.log('Albums Record Found:', albumsRecord);
 
     try {
       playlistsRecord = await pb
         .collection('userPlaylists')
         .getFirstListItem(`user="${userId}" && service="${service}"`);
     } catch (error) {
-      // Playlist record doesn't exist yet, continue with empty playlists
       playlistsRecord = { playlists: [] };
     }
 
-    console.log('Playlists Record Found:', playlistsRecord);
-
-    if (service === 'spotify') {
-      return {
-        albums: albumsRecord.albums || [],
-        playlists: playlistsRecord.playlists || [],
-        lastSynced: albumsRecord.lastSynced,
-      };
-    } else {
-      // Apple Music
-      return {
-        albums: albumsRecord.albums || [],
-        playlists: playlistsRecord.playlists || [],
-        lastSynced: albumsRecord.lastSynced,
-      };
-    }
+    return {
+      albums: albumsRecord.albums || [],
+      playlists: playlistsRecord.playlists || [],
+      lastSynced: albumsRecord.lastSynced,
+    };
   } catch (error) {
     console.error('Error in getStoredLibrary:', error);
     return {
