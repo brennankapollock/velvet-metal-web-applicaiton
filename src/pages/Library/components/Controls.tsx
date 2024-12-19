@@ -31,6 +31,8 @@ interface ControlsProps {
   activeTab: string;
   albumTypeFilter: 'all' | 'album' | 'single' | 'ep';
   onAlbumTypeChange: (type: 'all' | 'album' | 'single' | 'ep') => void;
+  isSelectionMode?: boolean;
+  onToggleSelection?: () => void;
 }
 
 export const Controls = ({
@@ -46,6 +48,8 @@ export const Controls = ({
   activeTab,
   albumTypeFilter,
   onAlbumTypeChange,
+  isSelectionMode,
+  onToggleSelection,
 }: ControlsProps) => {
   return (
     <div className="flex flex-col space-y-4">
@@ -83,7 +87,7 @@ export const Controls = ({
             </SelectContent>
           </Select>
 
-          {activeTab === 'albums' && (
+          {activeTab === 'albums' ? (
             <Select value={albumTypeFilter} onValueChange={onAlbumTypeChange}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Album Type" />
@@ -95,6 +99,21 @@ export const Controls = ({
                 <SelectItem value="ep">EP</SelectItem>
               </SelectContent>
             </Select>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (isSelectionMode && onToggleSelection) {
+                  // Clear selection state
+                  onToggleSelection();
+                } else if (onToggleSelection) {
+                  onToggleSelection();
+                }
+              }}
+            >
+              {isSelectionMode ? 'Cancel Selection' : 'Select Playlists'}
+            </Button>
           )}
         </div>
 

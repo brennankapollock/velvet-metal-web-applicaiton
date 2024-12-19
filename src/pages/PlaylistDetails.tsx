@@ -55,7 +55,7 @@ export default function PlaylistDetails() {
       }
       
       console.log('Fetching playlist details for:', id);
-      return getSpotifyPlaylistDetails(id, auth.accessToken);
+      return getSpotifyPlaylistDetails(id, auth.accessToken, user?.id);
     },
     enabled: !!id && !!user,
   });

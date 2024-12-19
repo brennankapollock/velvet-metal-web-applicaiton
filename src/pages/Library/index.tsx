@@ -12,7 +12,7 @@ import { getStoredLibrary, syncLibrary } from '@/lib/services';
 import { getUserServices } from '@/lib/services/streaming-auth';
 import { Playlist, ServiceType, ViewMode } from '@/lib/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { memo, useState } from 'react';
+import { memo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AlbumsTab } from './components/AlbumsTab';
@@ -24,6 +24,7 @@ export default function Library() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const playlistsTabRef = useRef(null);
 
   // State management
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -39,6 +40,7 @@ export default function Library() {
   const [albumTypeFilter, setAlbumTypeFilter] = useState<
     'all' | 'album' | 'single' | 'ep'
   >('all');
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
@@ -227,6 +229,10 @@ export default function Library() {
     setIsTransferModalOpen(true);
   };
 
+  const handleToggleSelection = () => {
+    setIsSelectionMode(!isSelectionMode);
+  };
+
   if (!isServiceConnected) {
     return <LibrarySkeleton />;
   }
@@ -254,6 +260,8 @@ export default function Library() {
               activeTab={activeTab}
               albumTypeFilter={albumTypeFilter}
               onAlbumTypeChange={handleAlbumTypeChange}
+              isSelectionMode={isSelectionMode}
+              onToggleSelection={handleToggleSelection}
             />
 
             {/* Scrollable Content Area */}
@@ -276,11 +284,12 @@ export default function Library() {
                   />
 
                   <PlaylistsTab
-                    playlists={data?.playlists || []}
-                    filteredPlaylists={filteredPlaylists}
+                    ref={playlistsTabRef}
+                    playlists={filteredPlaylists}
+                    isLoading={isLoading}
                     viewMode={viewMode}
-                    ItemComponent={MemoizedPlaylistCard}
                     onTransfer={handleTransfer}
+                    isSelectionMode={isSelectionMode}
                   />
                 </>
               )}

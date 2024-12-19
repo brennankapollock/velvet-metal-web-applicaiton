@@ -13,12 +13,46 @@ export interface SpotifyAuth {
 
 async function handleSpotifyRequest<T>(
   accessToken: string,
-  requestFn: (token: string) => Promise<T>
+  requestFn: (token: string) => Promise<T>,
+  userId?: string
 ): Promise<T> {
   const makeRequest = async (token: string) => {
     try {
       return await requestFn(token);
     } catch (error) {
+      // Check if the error is due to an expired token
+      if (error instanceof Error && 'status' in error && (error as any).status === 401) {
+        if (!userId) {
+          throw new Error('User ID is required for token refresh');
+        }
+
+        // Get the current auth data
+        const currentAuth = await getServiceAuth(userId, 'spotify');
+        if (!currentAuth?.refreshToken) {
+          throw new Error('No refresh token available');
+        }
+
+        try {
+          // Attempt to refresh the token
+          console.log('Token expired, attempting refresh...');
+          const newAuth = await refreshSpotifyToken(currentAuth.refreshToken);
+          
+          // Save the new tokens
+          await saveServiceAuth(userId, 'spotify', {
+            accessToken: newAuth.accessToken,
+            refreshToken: newAuth.refreshToken,
+            expiresAt: new Date(Date.now() + newAuth.expiresIn * 1000),
+          });
+
+          // Retry the request with the new token
+          console.log('Token refreshed, retrying request...');
+          return await requestFn(newAuth.accessToken);
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          throw new Error('Failed to refresh access token');
+        }
+      }
+      
       // Ensure error is properly formatted with status code if it's a fetch error
       if (error instanceof Error && 'status' in error) {
         const status = (error as any).status;
@@ -245,7 +279,7 @@ export async function getSpotifyPlaylists(accessToken: string, userId: string) {
       is_public: Boolean(item.public),
       external_url: item.external_urls?.spotify || null
     }));
-  });
+  }, userId);
 }
 
 export async function getSpotifyAlbums(accessToken: string) {
@@ -411,86 +445,37 @@ export async function getSpotifyAlbumDetails(
         previewUrl: track.preview_url,
       })),
     };
-  });
+  }, userId);
 }
 
 export async function getSpotifyPlaylistDetails(
   playlistId: string,
-  accessToken: string
+  accessToken: string,
+  userId?: string
 ) {
-  if (!playlistId) {
-    throw new Error('Playlist ID is required');
-  }
+  console.log('Getting playlist details for:', playlistId);
 
-  return handleSpotifyRequest(accessToken, async (token) => {
-    console.log('Fetching Spotify playlist:', playlistId);
-    const response = await fetch(
-      `https://api.spotify.com/v1/playlists/${playlistId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+  return handleSpotifyRequest(
+    accessToken,
+    async (token) => {
+      const response = await fetch(
+        `https://api.spotify.com/v1/playlists/${playlistId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = new Error('Failed to fetch playlist details');
+        (error as any).status = response.status;
+        throw error;
       }
-    );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Spotify API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-      });
-      throw new Error(`Failed to fetch playlist details: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    if (!data) {
-      throw new Error('Empty response from Spotify API');
-    }
-
-    // Ensure tracks exist and have items
-    if (!data.tracks?.items) {
-      console.error('No tracks found in playlist:', data);
-      throw new Error('No tracks found in playlist');
-    }
-
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      images: data.images,
-      service: 'spotify' as const,
-      tracks: {
-        items: data.tracks.items
-          .filter((item: any) => item?.track) // Filter out null tracks
-          .map((item: any) => ({
-            track: {
-              id: item.track?.id,
-              name: item.track?.name,
-              artists: item.track?.artists?.map((artist: any) => ({
-                id: artist.id,
-                name: artist.name,
-              })) || [],
-              album: item.track?.album ? {
-                id: item.track.album.id,
-                name: item.track.album.name,
-                images: item.track.album.images,
-              } : null,
-              duration_ms: item.track?.duration_ms,
-              explicit: item.track?.explicit,
-              preview_url: item.track?.preview_url,
-            }
-          })),
-        total: data.tracks?.total || 0
-      },
-      owner: {
-        id: data.owner?.id,
-        display_name: data.owner?.display_name,
-      },
-      tracks_count: data.tracks?.total || 0,
-      artwork: data.images?.[0] || null,
-      external_url: data.external_urls?.spotify,
-    };
-  });
+      const data = await response.json();
+      return data;
+    },
+    userId
+  );
 }
